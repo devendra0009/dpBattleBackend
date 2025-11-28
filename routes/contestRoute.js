@@ -1,4 +1,4 @@
-import express from 'express';
+import express from "express";
 import {
   createContest,
   createContestWithFriend,
@@ -9,25 +9,31 @@ import {
   getContestByUserId,
   joinContest,
   updateContest,
-} from '../controller/contestController.js';
-import singleUploadMulter from '../middleware/singleUploadMulter.js';
-import mulitpleUploadMulter from '../middleware/multipleUploadMulter.js';
+} from "../controller/contestController.js";
+import singleUploadMulter from "../middleware/singleUploadMulter.js";
+import mulitpleUploadMulter from "../middleware/multipleUploadMulter.js";
+import { authenticateToken } from "../utils/commonFunc.js";
 const router = express.Router();
 
 router
-  .get('/getAllContests', getAllContests)
-  .get('/getContestByContestId/:id', getContestByContestId)
-  .get('/getContestByUserId', getContestByUserId)
-  .post('/createContest', singleUploadMulter, createContest)
+  .get("/getAllContests", getAllContests)
+  .get("/getContestByContestId/:id", getContestByContestId)
+  .get("/getContestByUserId", getContestByUserId)
+  .post("/createContest", authenticateToken, singleUploadMulter, createContest)
   .post(
-    '/createContestWithFriend',
+    "/createContestWithFriend",
+    authenticateToken,
     mulitpleUploadMulter,
     createContestWithFriend
   )
-  .patch('/joinContest/:id', singleUploadMulter, joinContest)
-  .patch('/updateContest', updateContest) // if contest is active but date is expired so update
+  .patch("/joinContest/:id", authenticateToken, singleUploadMulter, joinContest)
+  .patch("/updateContest", authenticateToken, updateContest) // if contest is active but date is expired so update
   // .delete('/deleteContestByContestId', deleteContestByContestId); // this can be done by Admin only
-  .delete('/deleteContestByContestId', deleteContestByContestId)
-  .delete('/deleteContestByUserId', deleteContestByUserId);
+  .delete(
+    "/deleteContestByContestId",
+    authenticateToken,
+    deleteContestByContestId
+  )
+  .delete("/deleteContestByUserId", authenticateToken, deleteContestByUserId);
 
 export default router;

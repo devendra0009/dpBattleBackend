@@ -38,8 +38,9 @@ cloudinary.v2.config({
 app.use(express.json()); // like a body parser
 
 app.use('/api/auth', authRouter);
-app.use('/api/user', authenticateToken, userRouter);
-app.use('/api/contest', authenticateToken, contestRouter);
+// app.use('/api/user', authenticateToken, userRouter);
+app.use('/api/user', userRouter);
+app.use('/api/contest', contestRouter);
 // make separate routes for admin
 
 app.listen(PORT, (req, res) => {

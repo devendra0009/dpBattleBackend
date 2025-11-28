@@ -5,15 +5,65 @@ import getDataUri from '../utils/fileUri.js';
 import { getUserByUserEmail } from './userController.js';
 
 // when user sees all the active contests
+// ...existing code...
 export const getAllContests = async (req, res) => {
   try {
-    const contests = await Contest.find();
-    res.status(200).json({ contests: contests });
+    // pagination params
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const limit = Math.max(1, parseInt(req.query.limit || '10', 10));
+    const skip = (page - 1) * limit;
+
+    // filters: status, type, user (user id belongs to user1 or user2), q (text search)
+    const { status, type, user: userId, q } = req.query;
+    const filter = {};
+
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+    if (q) {
+      // assuming contests have fields like title or description; adjust fields as needed
+      filter.$or = [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+      ];
+    }
+    if (userId) {
+      filter.$or = filter.$or || [];
+      filter.$or.push({ user1: userId }, { user2: userId });
+    }
+
+    const totalCount = await Contest.countDocuments(filter);
+    const contests = await Contest.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+
+    res.status(200).json({
+      contests,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: page,
+        perPage: limit,
+      },
+    });
   } catch (error) {
-    console.log('Error fetching contest:', error);
+    console.error('Error fetching contests:', error);
     res.status(500).json({ msg: 'Internal server error' });
   }
 };
+// ...existing code...
+// export const getAllContests = async (req, res) => {
+//   try {
+//     const contests = await Contest.find();
+//     res.status(200).json({ contests: contests });
+//   } catch (error) {
+//     console.log('Error fetching contest:', error);
+//     res.status(500).json({ msg: 'Internal server error' });
+//   }
+// };
 
 // whenever a user clicks on a contest to see it/vote it -> then called to get full details of that contest
 export const getContestByContestId = async (req, res) => {

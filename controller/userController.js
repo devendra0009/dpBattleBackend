@@ -1,15 +1,96 @@
 import User from '../model/User.js';
 
+// export const getAllUsers = async (req, res) => {
+//   try {
+//     const users = await User.find({}, { password: 0 });
+//     res.status(200).json({ users: users });
+//   } catch (error) {
+//     console.log('Error registering user:', error);
+//     res.status(500).json({ msg: error.message });
+//   }
+// };
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}, { password: 0 });
-    res.status(200).json({ users: users });
+    // pagination params
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const limit = Math.max(1, parseInt(req.query.limit || '10', 10));
+    const skip = (page - 1) * limit;
+
+    // filters: q (text search on name/email), followers count range, following count range
+    const { q, minFollowers, maxFollowers, minFollowing, maxFollowing, sortFollowers } = req.query;
+    let filter = {};
+
+    if (q) {
+      filter.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const exprConditions = [];
+
+    if (minFollowers || maxFollowers) {
+      if (minFollowers) {
+        exprConditions.push({ $gte: [{ $size: '$followers' }, parseInt(minFollowers, 10)] });
+      }
+      if (maxFollowers) {
+        exprConditions.push({ $lte: [{ $size: '$followers' }, parseInt(maxFollowers, 10)] });
+      }
+    }
+
+    if (minFollowing || maxFollowing) {
+      if (minFollowing) {
+        exprConditions.push({ $gte: [{ $size: '$following' }, parseInt(minFollowing, 10)] });
+      }
+      if (maxFollowing) {
+        exprConditions.push({ $lte: [{ $size: '$following' }, parseInt(maxFollowing, 10)] });
+      }
+    }
+
+    if (exprConditions.length > 0) {
+      filter.$expr = exprConditions.length === 1 ? exprConditions[0] : { $and: exprConditions };
+    }
+
+    // Use aggregation pipeline for proper sorting and pagination
+    const pipeline = [
+      { $match: filter },
+      { $project: { password: 0 } },
+    ];
+
+    // Add sorting stage
+    if (sortFollowers === 'asc') {
+      pipeline.push({ $addFields: { followerCount: { $size: '$followers' } } });
+      pipeline.push({ $sort: { followerCount: 1, _id: 1 } });
+    } else if (sortFollowers === 'desc') {
+      pipeline.push({ $addFields: { followerCount: { $size: '$followers' } } });
+      pipeline.push({ $sort: { followerCount: -1, _id: 1 } });
+    } else {
+      pipeline.push({ $sort: { createdAt: -1, _id: 1 } });
+    }
+
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limit });
+
+    const users = await User.aggregate(pipeline);
+    const totalCount = await User.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+
+    res.status(200).json({
+      users,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: page,
+        perPage: limit,
+      },
+    });
   } catch (error) {
-    console.log('Error registering user:', error);
+    console.log('Error fetching users:', error);
     res.status(500).json({ msg: error.message });
   }
 };
-
+// ...existing code...
+// ...existing code...
 // for searching of other users by email
 export const getUserByUserEmail = async (req, res) => {
   try {
